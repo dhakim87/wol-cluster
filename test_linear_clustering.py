@@ -227,6 +227,10 @@ def plot_scatter3(filtered_df, best_clustering, cluster_info_map, title, col1_in
             subspace_basis_vectors = _fit_a_linear_subspace(filtered_df.T.to_numpy()[:,pidx], dim)
             u = subspace_basis_vectors[:,0][[col1_index,col2_index,col3_index]].T
             _draw_subspace_line(ax, u, maxx,maxy,maxz, label, min_label, max_label)
+            print("BASIS")
+            print(label)
+            print(np.array(subspace_basis_vectors)[:,0])
+            print(pd.Series(data=np.array(subspace_basis_vectors)[:,0], index=filtered_df.columns))
 
         if dim == 2:
             pidx = np.where(best_clustering == label)[0]
@@ -856,10 +860,10 @@ def iterative_clustering(filtered_df, initial_dim):
 
 def main():
     if __name__ == '__main__':
-        woltka_none_table = BiomTable("none")
-        woltka_species_table = BiomTable("species")
+        woltka_none_table = BiomTable("./dataset/biom/combined-none.biom")
+        woltka_species_table = BiomTable("./dataset/biom/combined-species.biom")
 
-        USE_SPECIES=True
+        USE_SPECIES=False
 
         if USE_SPECIES:
             woltka_table = woltka_species_table
@@ -878,7 +882,7 @@ def main():
 
         start_genera = 'Butyricimonas'
         skip_genera = set(["Bacteroides", "Clostridium"])
-        for genus in ['Akkermansia']: # Acidaminococcus
+        for genus in ['Butyricimonas']: # Acidaminococcus
             # if genus <= start_genera:
             #     continue
             # if genus in skip_genera:
@@ -941,9 +945,9 @@ def main():
             # plot_scatter3(filtered_df, final_assignment, cluster_info_map, genus, 8, 23, 130)
             # plot_scatter(filtered_df, final_assignment, genus, 8, 129)
             # plot_scatter3(filtered_df, final_assignment, cluster_info_map, genus, 1, 2, 3)
-            plot_scatter3(filtered_df, final_assignment, cluster_info_map, genus, 2, 3, 4)
-            plot_scatter3(filtered_df, final_assignment, cluster_info_map, genus, 7, 8, 9)
-            plot_scatter3(filtered_df, final_assignment, cluster_info_map, genus, 2, 6, 7)
+            plot_scatter3(filtered_df, final_assignment, cluster_info_map, genus, 1, 2, 3)
+            # plot_scatter3(filtered_df, final_assignment, cluster_info_map, genus, 7, 8, 9)
+            # plot_scatter3(filtered_df, final_assignment, cluster_info_map, genus, 2, 6, 7)
             # plot_scatter3(filtered_df, final_assignment, cluster_info_map, genus, 3, 4, 5)
             # plot_scatter3(filtered_df, final_assignment, cluster_info_map, genus, 2, 3, 4)
             # plot_scatter3(filtered_df, final_assignment, cluster_info_map, genus, 2, 3, 6)

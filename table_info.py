@@ -9,9 +9,8 @@ class TableInfo:
 
 
 class BiomTable(TableInfo):
-    def __init__(self, biom_type):
-        self.biom_type = biom_type
-        self.biom_filepath = "./dataset/biom/combined-" + biom_type + ".biom"
+    def __init__(self, biom_filepath):
+        self.biom_filepath = biom_filepath
 
     def load_dataframe(self):
         biom_table = load_table(self.biom_filepath)
@@ -26,7 +25,7 @@ class BiomTable(TableInfo):
         return genera
 
     def __str__(self):
-        return self.biom_type
+        return self.biom_filepath
 
 
 class CSVTable(TableInfo):
