@@ -143,20 +143,24 @@ def _spectral_clustering(affinity_matrix, nr_clusters):
     return labels
 
 
-def _calc_residuals(data, cluster_assignments, subspace_dimension):
+def calc_residuals(data, cluster_assignments, subspace_dimension, target_cluster=None):
     nr_data_points = data.shape[1]
     labels = np.unique(cluster_assignments)
     nr_clusters = len(labels)
     residuals = np.zeros(nr_data_points)
 
-    for gg in range(nr_clusters):
+    if target_cluster is not None:
+        labels = [target_cluster]
+        
+    for gg in range(len(labels)):
         pidx = np.where(cluster_assignments == labels[gg])[0]
-
-        # These are orthonormal column vectors
-        # TODO FIXME HACK:  Ack, this turns every face of the conic polyhedron into a plane doesn't it?
-        #  I need to eventually retrieve basis vectors of the conic polyhedron in order to transform the data
-        # print("BIG DATA\n", data)
-        subspace_basis_vectors = _fit_a_linear_subspace(data[:, pidx], subspace_dimension)
+        
+        if isinstance(subspace_dimension, int):
+            dim = subspace_dimension
+        else:
+            dim = subspace_dimension[labels[gg]]
+        
+        subspace_basis_vectors = _fit_a_linear_subspace(data[:, pidx], dim)
         dists = []
         for idx in pidx:
             vv = data[:, idx]
@@ -164,7 +168,7 @@ def _calc_residuals(data, cluster_assignments, subspace_dimension):
             dists.append(np.linalg.norm(vv - proj_vv))
         np.put(residuals, pidx, dists)
 
-    return residuals
+    return residuals    
 
 
 def _k_subspace_clustering(data, cluster_assignments, subspace_dimension, max_number_iterations):
@@ -196,7 +200,7 @@ def _k_subspace_clustering(data, cluster_assignments, subspace_dimension, max_nu
 
         cluster_assignments = np.argmin(dists_to_subspaces, axis=0)
 
-    residuals_1 = _calc_residuals(data, cluster_assignments, subspace_dimension)
+    residuals_1 = calc_residuals(data, cluster_assignments, subspace_dimension)
     # residuals = np.min(dists_to_subspaces, axis=0)  # This is the second to last residual, which is very wrong if the clustering isn't stable.
 
     # print(dists_to_subspaces.shape)

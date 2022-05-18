@@ -175,7 +175,7 @@ def _draw_subspace_line(ax, u, maxx, maxy, maxz, label, min_label, max_label):
 
 
 def plot_scatter3(filtered_df, best_clustering, cluster_info_map, title, col1_index, col2_index, col3_index, target_cluster=None):
-    print(filtered_df)
+    
     subspace_bases = calc_subspace_bases(filtered_df, best_clustering, cluster_info_map)
     all_resid = calc_all_residuals(filtered_df, best_clustering, subspace_bases)
     all_proj = calc_projected(filtered_df, best_clustering, subspace_bases)
