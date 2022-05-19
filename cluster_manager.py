@@ -1,4 +1,4 @@
-from linear_subspace_clustering import linear_subspace_clustering, calc_residuals
+from linear_subspace_clustering import linear_subspace_clustering, calc_residuals, calc_subspace_bases
 import numpy as np
 
 OUTLIER_CLUSTER_ID = -1
@@ -65,9 +65,37 @@ class ClusterManager:
         del new_state.cluster_dims[cluster_id]
         return new_state
     
-    def get_reassign_outliers(self):
+    # How should we manage rules about outliers?  Pass a validation function here?
+    def get_reassign_nearest(self, dim_penalty=0, outlier_thresh=None):
         new_state = self.cluster_state.copy()
+
+        subspace_bases = calc_subspace_bases(self.data, new_state.clusters, new_state.cluster_dims)
+
+        for sample_index in range(self.data.shape[1]):
+            pt = self.data[:, sample_index]
+            closest_cluster = OUTLIER_CLUSTER_ID
+            min_real_dist = float('inf')
+            min_heuristic_dist = float('inf')
+            for cluster_id in subspace_bases:
+                proj_pt = np.matmul(subspace_bases[cluster_id], np.matmul(subspace_bases[cluster_id].T, pt))
+                dist = np.linalg.norm(pt - proj_pt)
+                heuristic_dist = dist + dim_penalty * new_state.cluster_dims[cluster_id]
+                
+                if heuristic_dist < min_heuristic_dist:
+                    closest_cluster = cluster_id
+                    min_real_dist = dist
+                    min_heuristic_dist = heuristic_dist
+            
+            if outlier_thresh is None:
+                new_state.clusters[sample_index] = closest_cluster
+            else:
+                num_reads = np.sum(pt)
+                if min_real_dist / num_reads > outlier_thresh:
+                    new_state.clusters[sample_index] = OUTLIER_CLUSTER_ID
+                else:
+                    new_state.clusters[sample_index] = closest_cluster
         
+        return new_state
         
     
     #TODO pass ruleset instead of idx

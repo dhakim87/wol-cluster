@@ -217,6 +217,18 @@ def _fit_a_linear_subspace(data, dim_subspace):
     subspace_basis = UU[:, 0:dim_subspace]
     return subspace_basis
 
+def calc_subspace_bases(data, cluster_assignments, cluster_dims):
+    labels = np.unique(cluster_assignments)
+
+    vecs = {}
+    for gg in labels:
+        pidx = np.where(cluster_assignments == gg)[0]
+        if gg == -1:
+            continue
+        subspace_basis_vectors = _fit_a_linear_subspace(data[:, pidx], cluster_dims[gg])
+        vecs[gg] = subspace_basis_vectors
+    return vecs
+
 
 if __name__ == "__main__":
     # 6 points spread across two rays out from the origin.
