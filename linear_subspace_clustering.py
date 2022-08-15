@@ -182,6 +182,7 @@ def _k_subspace_clustering(data, cluster_assignments, subspace_dimension, max_nu
         #  is that okay??
         labels = np.unique(cluster_assignments)
         nr_clusters = len(labels)
+        print("ROUND: ", KK, " NR CLUSTERS: ", nr_clusters)
         dists_to_subspaces = np.zeros((nr_clusters, nr_data_points))
 
         for gg in range(nr_clusters):

@@ -1,14 +1,40 @@
 from linear_subspace_clustering import linear_subspace_clustering, calc_residuals, calc_subspace_bases
 import numpy as np
+import pandas as pd
+import json
 
 OUTLIER_CLUSTER_ID = -1
 class ClusterManager:
     
     def __init__(self, df, dim):
         self.data = df.T.to_numpy()
+        self.data_cols = df.columns
         self.cluster_state = ClusterState(self, -np.ones(df.shape[0]), {-1:dim})
         self.cluster_id_gen = -1
         self.initial_dim = dim
+        
+    @classmethod
+    def apply_bases_from_file(clz, file, df):
+        with open(file) as infile:
+            data_transform = json.load(infile)
+        subspace_bases = {}
+        key = list(data_transform.keys())[0]
+        if "all" in data_transform:
+            key = "all"
+        for subspace in range(len(data_transform[key])):
+            conic_basis = pd.read_json(data_transform[key][subspace])
+            conic_basis = conic_basis.loc[df.columns.tolist()]
+            subspace_bases[subspace] = conic_basis
+                
+        if df.columns.tolist() != conic_basis.index.tolist():
+            raise Exception("MISMATCHED ROWS/COLUMNS")
+
+        cm = clz(df, df.shape[1])
+        cm.cluster_state.cluster_dims={k:subspace_bases[k].shape[1] for k in subspace_bases}
+        cm.cluster_state.cluster_dims[OUTLIER_CLUSTER_ID] = cm.initial_dim
+        cm.get_reassign_nearest(subspace_bases=subspace_bases).apply()
+        cm.cluster_id_gen = max(cm.cluster_state.cluster_dims.keys())
+        return cm
     
     def get_merge_clusters(self, i, j, new_dim):
         new_state = self.cluster_state.copy()
@@ -31,7 +57,7 @@ class ClusterManager:
         
         idx = np.where(new_state.clusters == i)[0]
         cluster_data = self.data[:, idx]
-        new_dim = new_state.cluster_dims[i] - 1
+        new_dim = max(new_state.cluster_dims[i] - 1, 1)
         
         new_clusters, _ = linear_subspace_clustering(
             cluster_data, 
@@ -65,36 +91,55 @@ class ClusterManager:
         del new_state.cluster_dims[cluster_id]
         return new_state
     
+    def apply_active_clustering(self, new_df, dim_penalty=0, outlier_thresh=None):
+        subspace_bases = calc_subspace_bases(self.data, self.cluster_state.clusters, self.cluster_state.cluster_dims)
+        
+        new_filt_df = new_df[self.data_cols]
+
+        names = []
+        closests = []
+        for index, pt in new_filt_df.iterrows():
+            closest = self._find_closest(subspace_bases, pt, self.cluster_state.cluster_dims, dim_penalty=dim_penalty, outlier_thresh=outlier_thresh)
+            names.append(pt.name)
+            closests.append(closest)
+        
+        return pd.Series(data=closests, index=names)        
+        
+    def _find_closest(self, subspace_bases, pt, cluster_dims, dim_penalty=0, outlier_thresh=None):
+        closest_cluster = OUTLIER_CLUSTER_ID
+        min_real_dist = float('inf')
+        min_heuristic_dist = float('inf')
+        for cluster_id in subspace_bases:
+            proj_pt = np.matmul(subspace_bases[cluster_id], np.matmul(subspace_bases[cluster_id].T, pt))
+            dist = np.linalg.norm(pt - proj_pt)
+            heuristic_dist = dist + dim_penalty * cluster_dims[cluster_id]
+
+            if heuristic_dist < min_heuristic_dist:
+                closest_cluster = cluster_id
+                min_real_dist = dist
+                min_heuristic_dist = heuristic_dist
+
+        if outlier_thresh is None:
+            return closest_cluster
+        else:
+            num_reads = np.sum(pt)
+            if num_reads == 0 or min_real_dist / num_reads > outlier_thresh:
+                return OUTLIER_CLUSTER_ID
+            else:
+                return closest_cluster
+        
     # How should we manage rules about outliers?  Pass a validation function here?
-    def get_reassign_nearest(self, dim_penalty=0, outlier_thresh=None):
+    def get_reassign_nearest(self, dim_penalty=0, outlier_thresh=None, subspace_bases=None):
         new_state = self.cluster_state.copy()
 
-        subspace_bases = calc_subspace_bases(self.data, new_state.clusters, new_state.cluster_dims)
+        if subspace_bases is None:
+            subspace_bases = calc_subspace_bases(self.data, new_state.clusters, new_state.cluster_dims)
 
         for sample_index in range(self.data.shape[1]):
             pt = self.data[:, sample_index]
-            closest_cluster = OUTLIER_CLUSTER_ID
-            min_real_dist = float('inf')
-            min_heuristic_dist = float('inf')
-            for cluster_id in subspace_bases:
-                proj_pt = np.matmul(subspace_bases[cluster_id], np.matmul(subspace_bases[cluster_id].T, pt))
-                dist = np.linalg.norm(pt - proj_pt)
-                heuristic_dist = dist + dim_penalty * new_state.cluster_dims[cluster_id]
-                
-                if heuristic_dist < min_heuristic_dist:
-                    closest_cluster = cluster_id
-                    min_real_dist = dist
-                    min_heuristic_dist = heuristic_dist
-            
-            if outlier_thresh is None:
-                new_state.clusters[sample_index] = closest_cluster
-            else:
-                num_reads = np.sum(pt)
-                if min_real_dist / num_reads > outlier_thresh:
-                    new_state.clusters[sample_index] = OUTLIER_CLUSTER_ID
-                else:
-                    new_state.clusters[sample_index] = closest_cluster
-        
+            closest = self._find_closest(subspace_bases, pt, new_state.cluster_dims, dim_penalty=dim_penalty, outlier_thresh=outlier_thresh)
+            new_state.clusters[sample_index] = closest
+
         return new_state
         
     
@@ -129,7 +174,8 @@ class ClusterManager:
         cluster_dims = self.cluster_state.cluster_dims
         cluster_counts = self.cluster_state.get_cluster_counts()
 
-        keys = [(k, cluster_dims[k], cluster_counts[k]) for k in cluster_dims.keys()]
+        print("START FINALIZE:", cluster_counts)
+        keys = [(k, cluster_dims[k], cluster_counts.get(k,0)) for k in cluster_dims.keys()]
         keys.sort(key=lambda x:(x[1],-x[2]))
         final_pos = {}
         for i in range(len(keys)):
