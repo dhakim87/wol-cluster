@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 import math
+from plotting import _get_color, _draw_subspace_line
 
 MIN_GENUS_COUNT = 500
 
@@ -153,25 +154,6 @@ samples_to_highlight_2 = [
 ]
 
 
-def _get_color(label, min_label, max_label):
-    cmap = matplotlib.cm.get_cmap('Set1')
-    if min_label != max_label:
-        rgba = cmap((label - min_label) / (max_label - min_label))
-    else:
-        rgba = cmap(0)
-    return rgba
-
-
-def _draw_subspace_line(ax, u, maxx, maxy, maxz, label, min_label, max_label):
-    rgba = _get_color(label, min_label, max_label)
-    mx = maxx / u[0]
-    my = maxy / u[1]
-    mz = maxz / u[2]
-    multiplier = min(abs(mx), abs(my), abs(mz))
-
-    if multiplier == -mx or multiplier == -my or multiplier == -mz:
-        multiplier = -multiplier
-    ax.plot3D([0, u[0] * multiplier], [0, u[1] * multiplier], [0,u[2] * multiplier], color=rgba)
 
 
 def plot_scatter3(filtered_df, best_clustering, cluster_info_map, title, col1_index, col2_index, col3_index, target_cluster=None):

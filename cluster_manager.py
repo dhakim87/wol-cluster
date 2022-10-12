@@ -2,6 +2,8 @@ from linear_subspace_clustering import linear_subspace_clustering, calc_residual
 import numpy as np
 import pandas as pd
 import json
+from detnmf.detnmf import run_detnmf, run_caliper_nmf
+
 
 OUTLIER_CLUSTER_ID = -1
 class ClusterManager:
@@ -12,6 +14,28 @@ class ClusterManager:
         self.cluster_state = ClusterState(self, -np.ones(df.shape[0]), {-1:dim})
         self.cluster_id_gen = -1
         self.initial_dim = dim
+        self.saved_subspace_bases = None
+        
+    @classmethod
+    def apply_bases_from_detnmf(clz, df, n_components, alpha_scale=0.05, iterations=5000):
+        W,H = run_detnmf(df.to_numpy(), n_components, alpha_scale = alpha_scale, iterations=iterations)
+        
+        subspace_bases = {}
+        for subspace in range(H.shape[0]):
+            conic_basis = H[subspace,:].T
+            conic_basis = pd.DataFrame(conic_basis)
+            conic_basis.index = df.columns.tolist()
+            conic_basis = conic_basis.to_numpy()
+            subspace_bases[subspace] = conic_basis
+                
+        cm = clz(df, df.shape[1])
+        cm.cluster_state.cluster_dims={k:subspace_bases[k].shape[1] for k in subspace_bases}
+        cm.cluster_state.cluster_dims[OUTLIER_CLUSTER_ID] = cm.initial_dim
+        cm.get_reassign_nearest(subspace_bases=subspace_bases).apply()
+        cm.cluster_id_gen = max(cm.cluster_state.cluster_dims.keys())
+        cm.saved_subspace_bases = subspace_bases
+        return cm
+        
         
     @classmethod
     def apply_bases_from_file(clz, file, df):
@@ -34,7 +58,17 @@ class ClusterManager:
         cm.cluster_state.cluster_dims[OUTLIER_CLUSTER_ID] = cm.initial_dim
         cm.get_reassign_nearest(subspace_bases=subspace_bases).apply()
         cm.cluster_id_gen = max(cm.cluster_state.cluster_dims.keys())
+        cm.saved_subspace_bases = subspace_bases
         return cm
+    
+    def calc_subspace_bases(self):
+        # When bases came from a file or from detnmf, we just return those subspace bases.  
+        # otherwise, we recalculate them based on the clustering
+        if self.saved_subspace_bases is not None:
+            return self.saved_subspace_bases
+        else:
+            return calc_subspace_bases(self.data, self.cluster_state.clusters, self.cluster_state.cluster_dims)
+            
     
     def get_merge_clusters(self, i, j, new_dim):
         new_state = self.cluster_state.copy()
@@ -207,8 +241,15 @@ class ClusterState:
     def get_cluster_counts(self):
         labels, counts = np.unique(self.clusters, return_counts=True)
         label_counts = {}
+        max_id = self.manager.max_cluster_id()
+        
+        # initialize for all labels
+        for i in range(0, max_id + 1):
+            label_counts[i] = 0
+        # Fill in labels that occurred
         for i in range(len(labels)):
             label_counts[labels[i]] = counts[i]
+        # Special case for outlier label
         if OUTLIER_CLUSTER_ID in self.cluster_dims and OUTLIER_CLUSTER_ID not in label_counts:
             label_counts[OUTLIER_CLUSTER_ID] = 0
         return label_counts

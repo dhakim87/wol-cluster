@@ -1,7 +1,7 @@
 import numpy as np
 import sklearn.cluster
-
 import math
+from sklearn.utils.extmath import randomized_svd
 
 # A direct port of Jeffrey Ho's Linear_Subspace_clustering.m
 # Ported by Daniel Hakim
@@ -210,9 +210,15 @@ def _k_subspace_clustering(data, cluster_assignments, subspace_dimension, max_nu
     return cluster_assignments, residuals_1
 
 
-def _fit_a_linear_subspace(data, dim_subspace):
-    UU, SV, VV = np.linalg.svd(data)
-
+def _fit_a_linear_subspace(data, dim_subspace, randomized=True):
+    if not randomized:
+        UU, SV, VV = np.linalg.svd(data)
+    else:
+        UU, SV, VV = randomized_svd(data, 
+                              n_components=dim_subspace,
+                              n_iter=5,
+                              random_state=None)
+    
     idx = SV.argsort()[::-1]
     UU = UU[:, idx]
     subspace_basis = UU[:, 0:dim_subspace]

@@ -1,8 +1,31 @@
+from table_info import BiomTable
+import pandas as pd
+
+
 def is_ms(sample_id):
+    if "BLANK" in sample_id:
+        return False
+    
     ss = sample_id.split('.')
+    if ss[0] == "11326":
+        ss = ss[1:]
+        
     if len(ss) < 3:
         return False
     return ss[1].endswith("1")
+
+def is_new_sample_closure(new_samples_set):
+    return lambda x: x in new_samples_set
+
+def build_new_samples_set(new_files):
+    all_dfs = []
+    for biom_table in new_files:
+        bt = BiomTable(biom_table)
+        df = bt.load_dataframe()
+        all_dfs.append(df)
+
+    df = pd.concat(all_dfs).fillna(0)
+    return set(list(df.index))
 
 imsms_plots={
     "Acetivibrio":["G001461035", "G000179595", "G000179595"],
