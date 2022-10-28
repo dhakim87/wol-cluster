@@ -35,19 +35,24 @@ class DeterminantZeroCollapse:
         for r in range(H.shape[0]):
             H_prime = np.vstack((H[:r, :], H[r+1:,]))
             # TODO FIXME HACK: nnls itself can fail with a RuntimeError("too many iterations").  Ridiculous.
-            output_pt, l2_resid = scipy.optimize.nnls(H_prime.T, H[r,:])
+            try:
+                output_pt, l2_resid = scipy.optimize.nnls(H_prime.T, H[r,:])
+            except RuntimeError as e:
+                # Couldn't run nnls, argh.
+                return None, None
+
             if l2_resid < min_resid:
                 min_resid = l2_resid
                 min_r = r
                 approx_output_pt = output_pt
             if l2_resid < 0.001:
-                print("Row", r, H[r,:], "is redundant")
-                print(H_prime, "*", output_pt)
+                # print("Row", r, H[r,:], "is redundant")
+                # print(H_prime, "*", output_pt)
                 return r, output_pt
-        print("Oops, determinant was zero but there's no redundant rows...")
-        print("Best candidate row:", r)
-        print("L2 resid: ", min_resid)
-        raise Exception("Can't find redundant row")
+        # print("Oops, determinant was zero but there's no redundant rows...")
+        # print("Best candidate row:", r)
+        # print("L2 resid: ", min_resid)
+        return None, None
 
     @staticmethod
     def replace_row(W, H, r, row_conversion):

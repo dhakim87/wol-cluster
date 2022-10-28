@@ -104,6 +104,7 @@ def run_detnmf(X, components, alpha=None, alpha_scale=None, alpha_calculator=Non
             H = (H + beta) * det_nmf_H(X, W, H, iter, alpha=alpha, alpha_scale=alpha_scale, alpha_calculator=alpha_calculator)
             W = W * nmf_W(X, W, H)
             W, H = L2_normalize(W,H)
+            H[H < 0.0001] = 0.0001
 
             if iter % 100 == 0:
                 alpha_print = alpha
@@ -159,3 +160,26 @@ def run_caliper_nmf(X, components, W=None, H=None, alpha=0.95, iterations=50000)
         if iter % 100 == 0:
             print(iter, L2_residual(X,W,H), determinant(H))
     return W, H
+
+
+def guess_num_components(X, max_components, alpha=None, alpha_scale=None, alpha_calculator=None, W=None, H=None, iterations=5000, beta=None, beta_calculator=None, verbose=True, min_det = 1e-15):
+    max_success = 1
+    min_fail = max_components + 1
+    while max_success < min_fail - 1:
+        success = True
+        n_components = (max_success + min_fail) // 2
+        try:
+            W, H = run_detnmf(X, n_components, alpha, alpha_scale, alpha_calculator, W, H, iterations, beta, beta_calculator, None, verbose)
+            if determinant(H) < min_det:
+                success = False
+        except DeterminantZeroException as e:
+            success = False
+        if success:
+            max_success = n_components
+        else:
+            min_fail = n_components
+        print("Success", success, "Max Success:", max_success, "Min Fail", min_fail)
+
+    print("Final Guess:", max_success)
+    return max_success
+
