@@ -31,10 +31,6 @@ def nmf_W(X, W, H):
 def det_nmf_H(X,W,H, iteration, alpha=None, alpha_scale=None, alpha_calculator=None):
     WTXoverWTWH = nmf_H(X,W,H)
     HHT = np.dot(H, H.T)  # Hmm, could reuse this if we like
-    detHHT = np.linalg.det(HHT)
-    if detHHT < 1e-30:
-        raise DeterminantZeroException("Det = " + str(detHHT))
-    HHTinvH = np.dot(np.linalg.inv(HHT), H)
     WTW = np.dot(W.T, W)
     if alpha is None:
         if alpha_scale is not None:
@@ -43,10 +39,16 @@ def det_nmf_H(X,W,H, iteration, alpha=None, alpha_scale=None, alpha_calculator=N
             alpha = alpha_calculator.calculate(WTW, iteration)
         else:
             raise Exception("No Alpha Set")
+    if alpha == 0:
+        return WTXoverWTWH
+
+    detHHT = np.linalg.det(HHT)
+    if detHHT < 1e-30:
+        raise DeterminantZeroException("Det = " + str(detHHT))
+    HHTinvH = np.dot(np.linalg.inv(HHT), H)
     WTWH = np.dot(WTW, H)  # Hmm, could reuse this if we like
 
     HHTinvHoverWTWH = HHTinvH / WTWH  # Elementwise division, check for Nans
-
     HHTinvHoverWTWH[np.isnan(HHTinvHoverWTWH)] = 0
 
     # print("ACK")
@@ -77,7 +79,15 @@ def L1_normalize(W, H):
     return W, H
 
 
-def run_detnmf(X, components, alpha=None, alpha_scale=None, alpha_calculator=None, W=None, H=None, iterations=5000, beta=None, beta_calculator=None, det0_handler=None, verbose=True):
+def run_detnmf(X, components, alpha=None, alpha_scale=None, alpha_calculator=None, W=None, H=None, iterations=5000, beta=None, beta_calculator=None, det0_handler=None, column_scale=False, verbose=True):
+    # For the purposes of rescaling to avoid discarding low abundance columns
+    if column_scale:
+        # Technically not min max scaling since we have non negative matrices and want 0 to remain 0.
+        col_scaling = X.max(axis=0)
+        # If any columns have max 0, set them to max 1 so we don't rescale them and get nans.
+        col_scaling[col_scaling == 0] = 1
+        X = X / col_scaling
+
     # For the purposes of rescaling to avoid numerical stability issues, we may think of X as the initial W
     # and H as the axes of the space of X with num components equal to the number of columns
     # If we center X, we can help avoid WTW going to 0 or infinity, we just need to rescale W at the end by the same value.
@@ -123,6 +133,10 @@ def run_detnmf(X, components, alpha=None, alpha_scale=None, alpha_calculator=Non
                 raise(exc)
 
     W = W * Xmean
+
+    if column_scale:
+        H = (H.T * col_scaling.reshape(-1,1)).T
+        W, H = L1_normalize(W, H)
     return W,H
 
 

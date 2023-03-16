@@ -2,6 +2,7 @@ import pandas as pd
 
 HACK_FOR_CARLOS=False
 
+
 def list_extended_akkermansia():
     print("Applying hack to extend akkermansia genomes")
     # TODO FIXME HACK:  Support for Carlos' extended Akkermansia dataset
@@ -73,3 +74,17 @@ def list_woltka_refs(df, woltka_meta_df, genus=None):
     refs = refs.reset_index()
     refs = refs.sort_values(["total", "#genome"], ascending=False)[['total', '#genome','species']]
     return refs
+
+
+def filter_and_sort_df(df, woltka_meta_df, genus, min_genus_count=0):
+    if genus == 'all':
+        refs_df = list_woltka_refs(df, woltka_meta_df)
+    else:
+        refs_df = list_woltka_refs(df, woltka_meta_df, genus)
+
+    genomes = refs_df['#genome'].tolist()
+    filtered_df = df[genomes]
+
+    filtered_df_sum = filtered_df.sum(axis=1)
+    filtered_df = filtered_df[filtered_df_sum >= min_genus_count]
+    return filtered_df

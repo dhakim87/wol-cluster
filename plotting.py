@@ -51,8 +51,8 @@ def plot_taxavec2(filtered_df, title, c1, c2, xlabel, ylabel, W, H, subplot_ax, 
     if not skipx:
         ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    ax.set_xlim([0, maxx * 1.5 + 100])
-    ax.set_ylim([0, maxy * 1.5 + 100])
+    # ax.set_xlim([0, maxx * 1.5 + 100])
+    # ax.set_ylim([0, maxy * 1.5 + 100])
 
     # if subspace_bases is not None:
     #     plt.legend(handles=patches)
@@ -61,7 +61,7 @@ def plot_taxavec2(filtered_df, title, c1, c2, xlabel, ylabel, W, H, subplot_ax, 
         plt.show()
 
 
-def plot_taxavec3(filtered_df, title, c1, c2, c3, xlabel, ylabel, zlabel, W, H, subplot_ax=None, skipxy=False):
+def plot_taxavec3(filtered_df, title, c1, c2, c3, xlabel, ylabel, zlabel, W, H, subplot_ax=None, skipxy=False, linewidth=6):
     if subplot_ax is None:
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
@@ -81,7 +81,7 @@ def plot_taxavec3(filtered_df, title, c1, c2, c3, xlabel, ylabel, zlabel, W, H, 
             u = H[label,[col1_index, col2_index, col3_index]]
             rgba = _get_color(label, 0, H.shape[0]-1)
             max_W = np.max(W[:, label])
-            ax.plot3D([0, u[0] * max_W], [0, u[1] * max_W], [0,u[2] * max_W], color=rgba, linewidth=6)
+            ax.plot3D([0, u[0] * max_W], [0, u[1] * max_W], [0,u[2] * max_W], color=rgba, linewidth=linewidth)
             # _draw_subspace_line(ax,u,maxx,maxy,maxz,label,0,H.shape[0]-1)
 
     ax.scatter(filtered_df[c1], filtered_df[c2], filtered_df[c3], cmap="Set1")

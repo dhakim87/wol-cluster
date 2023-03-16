@@ -79,6 +79,29 @@ def calc_L1_resids(filtered_df, W, H):
     return resids, resids_pcts
 
 
+def calc_L1_resids_coexclusive(filtered_df, W, H):
+    print(H)
+
+    X = filtered_df.to_numpy()
+    resids = []
+    resids_pcts = []
+    for sample_i in range(X.shape[0]):
+        sample = X[sample_i, :]
+
+        coefs = W[sample_i, :]
+        max_coef_i = np.argmax(coefs)
+
+        best_row = H[max_coef_i, :]
+        proj_onto_row = np.dot(np.dot(sample, best_row) / np.dot(best_row, best_row), best_row)
+        delta = sample - proj_onto_row
+        L1_resid = np.sum(np.abs(delta))
+        L1_resid_pct = L1_resid / np.sum(sample)
+        resids.append(L1_resid)
+        resids_pcts.append(L1_resid_pct)
+
+    return np.array(resids), np.array(resids_pcts)
+
+
 def _plot_fix_resids(ax, genus, l1_resids, vlines=None, x_label="Reads"):
     # sort the data in ascending order
     x = np.sort(l1_resids)
@@ -108,7 +131,7 @@ def get_filename_W(title, num_components):
 def get_filename_H(title, num_components):
     return get_filename(title, num_components) + "_H.npy"
 
-def write_best_taxavec_genus(filtered_df, title, num_components, num_attempts, alpha_calculator=AlphaCalculator(0.05, 0, 5000), det0_handler=DeterminantZeroCollapse(), verbose=False):
+def write_best_taxavec_genus(filtered_df, title, num_components, num_attempts, alpha_calculator=AlphaCalculator(0.05, 0, 5000), det0_handler=DeterminantZeroCollapse(), column_scale=False, verbose=False):
     X = filtered_df.to_numpy()
 
     best_resid = math.inf
@@ -119,7 +142,7 @@ def write_best_taxavec_genus(filtered_df, title, num_components, num_attempts, a
             if alpha_calculator is not None:
                 # default values use the same object on all calls.
                 alpha_calculator.reset()
-            W, H = run_detnmf(X, num_components, alpha_calculator=alpha_calculator, iterations=50000, beta_calculator=BetaCalculator(0.0001, 2500), det0_handler=det0_handler, verbose=verbose)
+            W, H = run_detnmf(X, num_components, alpha_calculator=alpha_calculator, iterations=50000, beta_calculator=BetaCalculator(0.0001, 2500), det0_handler=det0_handler, column_scale=column_scale, verbose=verbose)
 
             r, output_pt = DeterminantZeroCollapse.find_redundant_row(np.dot(H, H.T))
             while r is not None:
@@ -337,6 +360,8 @@ def ecoli_plots():
     dfs = [BiomTable(b).load_dataframe() for b in BIOM_TABLE]
     df = pd.concat(dfs).fillna(0)
 
+    # df = CSVTable("./dataset/biom/celeste_ecoli_kraken.tsv", sep="\t", index_col="sampleid").load_dataframe()
+
     # # Let's do the most bog standard filtering and show that there's still tons of stuff
     # # that remains that is linearly dependent on E. coli.
     # print(df)
@@ -356,28 +381,28 @@ def ecoli_plots():
     print(df)
 
 
-    is_ecoli = pd.Series(np.zeros(df_sum_pct.shape), index=df_sum_pct.index)
-    is_ecoli_nan = pd.Series(np.full(df_sum_pct.shape, np.nan), index=df_sum_pct.index)
-
-    is_ecoli.loc[["G000008865", "G000026325", "G000026345",
-                        "G000183345", "G000299455", "G000759795",
-                        "G001283625"]] = 1
-    is_ecoli_nan.loc[["G000008865", "G000026325", "G000026345",
-                  "G000183345", "G000299455", "G000759795",
-                  "G001283625"]] = 1
-    empress = pd.DataFrame([df_sum_pct, df_sum_pct > 0, df_sum_pct > 1/10000, is_ecoli, is_ecoli_nan]).T
-    empress.index.name = "Feature ID"
-    empress.columns = ["frac_reads", "one_read", "passes_abundance", "is_ecoli", "is_ecoli_nan"]
-    print(empress)
-    empress_ecoli = empress[["is_ecoli"]]
-    empress_ecoli = empress_ecoli[empress_ecoli["is_ecoli"] == 1]
-    empress_one_read = empress[["one_read"]]
-    empress_one_read = empress_one_read[empress["one_read"] == 1]
-    empress_pass_filter = empress[["passes_abundance"]]
-    empress_pass_filter = empress_pass_filter[empress_pass_filter["passes_abundance"] == 1]
-    print(empress_ecoli.shape)
-    print(empress_one_read.shape)
-    print(empress_pass_filter.shape)
+    # is_ecoli = pd.Series(np.zeros(df_sum_pct.shape), index=df_sum_pct.index)
+    # is_ecoli_nan = pd.Series(np.full(df_sum_pct.shape, np.nan), index=df_sum_pct.index)
+    #
+    # is_ecoli.loc[["G000008865", "G000026325", "G000026345",
+    #                     "G000183345", "G000299455", "G000759795",
+    #                     "G001283625"]] = 1
+    # is_ecoli_nan.loc[["G000008865", "G000026325", "G000026345",
+    #               "G000183345", "G000299455", "G000759795",
+    #               "G001283625"]] = 1
+    # empress = pd.DataFrame([df_sum_pct, df_sum_pct > 0, df_sum_pct > 1/10000, is_ecoli, is_ecoli_nan]).T
+    # empress.index.name = "Feature ID"
+    # empress.columns = ["frac_reads", "one_read", "passes_abundance", "is_ecoli", "is_ecoli_nan"]
+    # print(empress)
+    # empress_ecoli = empress[["is_ecoli"]]
+    # empress_ecoli = empress_ecoli[empress_ecoli["is_ecoli"] == 1]
+    # empress_one_read = empress[["one_read"]]
+    # empress_one_read = empress_one_read[empress["one_read"] == 1]
+    # empress_pass_filter = empress[["passes_abundance"]]
+    # empress_pass_filter = empress_pass_filter[empress_pass_filter["passes_abundance"] == 1]
+    # print(empress_ecoli.shape)
+    # print(empress_one_read.shape)
+    # print(empress_pass_filter.shape)
 
     # empress_ecoli.to_csv("./dataset/newick/ecoli.tsv", sep='\t')
     # empress_one_read.to_csv("./dataset/newick/one_read.tsv", sep='\t')
@@ -386,18 +411,21 @@ def ecoli_plots():
     # write_best_taxavec_genus(df, "Escherichia_Isolates_Filtered", 2, 3, alpha_calculator=AlphaCalculator(0.05, 0, 5000))
     W, H = load_best_taxavec_genus("Escherichia_Isolates_Filtered", 2)
 
+    # write_best_taxavec_genus(df, "Escherichia_Isolates_Kraken_Filtered", 2, 3, alpha_calculator=AlphaCalculator(0.05, 0, 5000))
+    # W, H = load_best_taxavec_genus("Escherichia_Isolates_Kraken_Filtered", 2)
+
     print(W, H)
     fig = plt.figure(figsize=(8, 6))
-    ax = fig.add_subplot(2, 2, 1, projection='3d')
-    _plot_tv3(df, woltka_meta_df, "E. Coli Nissle", "G000183345", "G000026345", "G000026325", W, H, ax)
-    # ax = fig.add_subplot(2, 2, 2, projection='3d')
+    # ax = fig.add_subplot(2, 2, 1, projection='3d')
+    # _plot_tv3(df, woltka_meta_df, "E. Coli Nissle", "G000183345", "G000026345", "G000026325", W, H, ax)
+    # # ax = fig.add_subplot(2, 2, 2, projection='3d')
     # _plot_tv3(df, woltka_meta_df, "E. Coli Nissle", "G000299455", "G000008865", "G000006925", W, H, ax)
     # ax = fig.add_subplot(2, 2, 3, projection='3d')
     # _plot_tv3(df, woltka_meta_df, "E. Coli Nissle", "G000012005", "G001283625", "G001941055", W, H, ax)
 
     colors = []
     for i in df.index:
-        second = i.split(".")[1]
+        second = i.split(".")[1] # 0 for kraken, 1 for woltka, blah.
         if second.startswith("4"):
             colors.append("m")
         elif second.startswith("2"):
@@ -425,13 +453,8 @@ def ecoli_plots():
     fig.tight_layout()
     plt.show()
 
-
-
-
 # for i in range(2, df.shape[1]):
     #     _plot_tv3(df, woltka_meta_df, "E. Coli Nissle", "G000183345", "G000026345", df.columns[i], W, H, None)
-
-
     distant_relatives = [
         "G001604445", "G001941055", "G001750165", "G000238795",
         # "G000415085", "G000415005", "G000648175", "G000007785",  # One enterococcus faecalis is probably fine.
@@ -447,16 +470,25 @@ def ecoli_plots():
     plt.show()
 
 
-
 # Overlap:
 # Synergistales
 # Ruminococcus Zagget 7
 
-def bulk_plots():
+def bulk_plots(show_plots=False):
+    PLOT=show_plots
+
     woltka_meta_df = CSVTable("./woltka_metadata.tsv", delimiter="\t").load_dataframe()
     df = BiomTable("./dataset/biom/imsms-combined-none.biom").load_dataframe()
     best_components = {}
-    with open("./taxavec_best_results/bulk_components.tsv", "r+") as component_file:
+    counter = 0
+    result_rows = []
+
+    fig = None  # plt.figure(figsize=(6, 4))
+    resid_left = None  # fig.add_subplot(1, 2, 1)
+    resid_right = None  # fig.add_subplot(1, 2, 2)
+
+    with open("./taxavec_best_results/bulk_components.tsv", "a+") as component_file:
+        component_file.seek(0)
         for line in component_file.readlines():
             line = line[:-1]  # stupid newlines.
             ss = line.split("\t")
@@ -465,7 +497,7 @@ def bulk_plots():
             best_components[ss[0]] = int(ss[1])
 
         for genus in plot_definitions.imsms_plots:
-            if genus < "Atopobium":
+            if genus != "Acinetobacter":
                 continue
             filtered_df = filter_df(df, woltka_meta_df, genus)
             cols = plot_definitions.imsms_plots[genus]
@@ -481,30 +513,73 @@ def bulk_plots():
 
             title = genus + "_imsms_bulk"
             if not os.path.exists(get_filename_W(title, approx_components)):
-                W, H = write_best_taxavec_genus(filtered_df, title, approx_components, 10, verbose=False)
+                W, H = write_best_taxavec_genus(filtered_df, title, approx_components, 10, column_scale=True, verbose=False)
                 # Some det0 handlers can collapse components
                 approx_components = H.shape[0]
-                best_components[genus] = approx_components
-                component_file.write(genus + "\t" + str(approx_components) + "\n")
-                component_file.flush()
-                os.fsync(component_file)  # okay that's the dumbest api ever.
+                if genus not in best_components or best_components[genus] != approx_components:
+                    best_components[genus] = approx_components
+                    component_file.write(genus + "\t" + str(approx_components) + "\n")
+                    component_file.flush()
+                    os.fsync(component_file)  # okay that's the dumbest api ever.
 
             W, H = load_best_taxavec_genus(title, approx_components)
             W, H = L1_normalize(W, H)
 
+            if PLOT:
+                _plot_tv3(filtered_df, woltka_meta_df, genus, cols[0], cols[1], cols[2], W, H, None)
 
-            print(genus)
-            print(W)
-            print(H)
-            _plot_tv3(filtered_df, woltka_meta_df, genus, cols[0], cols[1], cols[2], W, H, None)
+            resids, resids_pcts = calc_L1_resids(filtered_df, W, H)
+            coex_resids, coex_resids_pcts = calc_L1_resids_coexclusive(filtered_df, W, H)
+            if resid_left is None:
+                fig = plt.figure(figsize=(6, 4))
+                ax = fig.add_subplot(1, 2, 1)
+            else:
+                ax = resid_left
+            if PLOT:
+                _plot_fix_resids(ax, genus, resids, x_label="Reads")
+                _plot_fix_resids(ax, genus, coex_resids, x_label="Reads")
+            if resid_right is None:
+                ax = fig.add_subplot(1, 2, 2)
+            else:
+                ax = resid_right
+            if PLOT:
+                _plot_fix_resids(ax, genus, resids_pcts, vlines=[0.05, 0.10], x_label="Fraction Per Sample Reads")
+                _plot_fix_resids(ax, genus, coex_resids_pcts, vlines=[0.05, 0.10], x_label="Fraction Per Sample Reads")
+
+            if PLOT:
+                if resid_left is None:
+                    plt.show()
+
+            resid_80 = np.sort(resids)[int(.8 * len(resids))]
+            resid_80_pct = np.sort(resids_pcts)[int(.8 * len(resids_pcts))]
+            coex_resid_80 = np.sort(coex_resids)[int(.8 * len(resids))]
+            coex_resid_80_pct = np.sort(coex_resids_pcts)[int(.8 * len(resids_pcts))]
+
+            row = [genus, H.shape[0], resid_80, resid_80_pct, coex_resid_80, coex_resid_80_pct]
+            result_rows.append(row)
+            print(genus,
+                  "Num Components:", H.shape[0],
+                  "80% resid reads", resid_80,
+                  "80% resid frac", resid_80_pct,
+                  "80% resid reads exclusive", coex_resid_80,
+                  "80% resid frac exclusive", coex_resid_80_pct,
+              )
+
+    import csv
+    with open('taxavec_best_results/results.csv', 'w', newline='') as csvfile:
+        fieldnames = ["genus", "components", "resid_80_reads", "resid_80_frac", "coex_resids", "coex_resids_pcts"]
+        writer = csv.writer(csvfile)
+        writer.writerow(fieldnames)
+        for r in result_rows:
+            writer.writerow(r)
 
 
 if __name__ == "__main__":
     # imsms_plots()
     # new_imsms_plots()
     # finrisk_plots()
-    # ecoli_plots()
-    bulk_plots()
+    ecoli_plots()
+    # bulk_plots(show_plots=True)
 
     # W, H = load_best_taxavec_genus("Acidaminococcus_imsms_bulk", 5)
     # print(H)

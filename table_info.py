@@ -13,9 +13,18 @@ class BiomTable(TableInfo):
         self.biom_filepath = biom_filepath
 
     def load_dataframe(self):
-        biom_table = load_table(self.biom_filepath)
-        table = Artifact.import_data("FeatureTable[Frequency]", biom_table)
-        df = table.view(pd.DataFrame)
+        bioms = self.biom_filepath
+        if not isinstance(bioms, list):
+            bioms = [bioms]
+
+        all_dfs = []
+        for biom_path in bioms:
+            biom_table = load_table(biom_path)
+            table = Artifact.import_data("FeatureTable[Frequency]", biom_table)
+            df = table.view(pd.DataFrame)
+            all_dfs.append(df)
+
+        df = pd.concat(all_dfs).fillna(0)
         return df
 
     def read_biom_metadata(self):

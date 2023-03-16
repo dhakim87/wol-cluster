@@ -3,7 +3,7 @@ import math
 
 
 # We need the ability to merge similar vectors that come back from clustering.
-def merge_similar_vectors(vectors, weights, same_thresh_degrees = 5):
+def merge_similar_vectors(vectors, weights, same_thresh_degrees=5):
     def kruskal_top(groups, i):
         if i not in groups:
             return i
@@ -24,9 +24,9 @@ def merge_similar_vectors(vectors, weights, same_thresh_degrees = 5):
     vectors = np.copy(vectors)
     for col in range(vectors.shape[1]):
         l2 = np.linalg.norm(vectors[:, col])
-        vectors[:,col] /= l2
+        vectors[:, col] /= l2
         if np.sum(vectors[:,col]) < 0:
-            vectors[:,col] = -vectors[:,col]
+            vectors[:, col] = -vectors[:, col]
 
     # Find all nearly parallel/anti-parallel vectors, probably have to collapse these or we'll have
     # extreme numerical instabilities.
